@@ -138,11 +138,11 @@ MarkerLabel_.prototype.onAdd = function () {
     me.marker_.setAnimation(null);
   };
 
-  this.getPanes().overlayImage.appendChild(this.labelDiv_);
+  this.getPanes().markerLayer.appendChild(this.labelDiv_);
   this.getPanes().overlayMouseTarget.appendChild(this.eventDiv_);
   // One cross is shared with all markers, so only add it once:
   if (typeof MarkerLabel_.getSharedCross.processed === "undefined") {
-    this.getPanes().overlayImage.appendChild(this.crossDiv_);
+    this.getPanes().markerLayer.appendChild(this.crossDiv_);
     MarkerLabel_.getSharedCross.processed = true;
   }
 
@@ -317,12 +317,11 @@ MarkerLabel_.prototype.onAdd = function () {
  * @private
  */
 MarkerLabel_.prototype.onRemove = function () {
-  var i;
   this.labelDiv_.parentNode.removeChild(this.labelDiv_);
   this.eventDiv_.parentNode.removeChild(this.eventDiv_);
 
   // Remove event listeners:
-  for (i = 0; i < this.listeners_.length; i++) {
+  for (var i = 0; i < this.listeners_.length; i++) {
     google.maps.event.removeListener(this.listeners_[i]);
   }
 };
@@ -331,10 +330,11 @@ MarkerLabel_.prototype.onRemove = function () {
  * Draws the label on the map.
  * @private
  */
-MarkerLabel_.prototype.draw = function () {
+MarkerLabel_.prototype.draw = function () {    
   this.setContent();
   this.setTitle();
   this.setStyles();
+  this.setPosition();
 };
 
 /**
@@ -343,7 +343,14 @@ MarkerLabel_.prototype.draw = function () {
  * @private
  */
 MarkerLabel_.prototype.setContent = function () {
+
   var content = this.marker_.get("labelContent");
+  var oldContent = this.labelDiv_.innerHTML;
+
+  if (content == oldContent){
+    return;
+  }
+
   if (typeof content.nodeType === "undefined") {
     this.labelDiv_.innerHTML = content;
     this.eventDiv_.innerHTML = this.labelDiv_.innerHTML;
@@ -433,7 +440,14 @@ MarkerLabel_.prototype.setAnchor = function () {
  * @private
  */
 MarkerLabel_.prototype.setPosition = function (yOffset) {
-  var position = this.getProjection().fromLatLngToDivPixel(this.marker_.getPosition());
+
+  var projection = this.getProjection();
+
+  if (typeof projection === "undefined" || projection == null) {
+    return;
+  }
+
+  var position = projection.fromLatLngToDivPixel(this.marker_.getPosition());
   if (typeof yOffset === "undefined") {
     yOffset = 0;
   }
@@ -579,4 +593,100 @@ MarkerWithLabel.prototype.setMap = function (theMap) {
 
   // ... then deal with the label:
   this.label.setMap(theMap);
+};
+
+/**
+ * Overrides the standard Marker setOptions function.
+ * @param {options} the options to be set.
+ * @private
+ */
+MarkerWithLabel.prototype.setOptions = function (options) {
+
+  //This is an optimized version of the setOptions
+  // 1. Prevents flicker by not recreating everything, just updating the modified values
+
+  // Call the inherited function...
+ //google.maps.Marker.prototype.setOptions.apply(this, arguments);
+
+
+  if (options.animation) {
+    this.setAnimation(options.animation);
+  }
+
+  if (options.attribution) {
+    this.setAttribution(options.attribution);
+  }
+
+  if (options.clickable) {
+    this.setClickable(options.clickable);
+  }
+
+  if (options.cursor) {
+    this.setCursor(options.cursor);
+  }
+
+  if (options.draggable) {
+    this.setDraggable(options.draggable);
+  }
+
+  var oldIcon = this.getIcon();     
+  if (oldIcon && options.icon) {
+
+    var iconChanged = 
+         (oldIcon.origin && options.icon.origin && !oldIcon.origin.equals(options.icon.origin)) ||
+         (oldIcon.size && options.icon.size && !oldIcon.size.equals(options.icon.size)) ||
+         (oldIcon.url && options.icon.url && oldIcon.url != options.icon.url) ||
+         (oldIcon.optimized && options.icon.optimized && oldIcon.optimized != options.icon.optimized) ||
+         (oldIcon.scaledSize && options.icon.scaledSize && !oldIcon.scaledSize.equals(options.icon.scaledSize)) ||
+         (oldIcon.anchor && options.icon.anchor && !oldIcon.anchor.equals(options.icon.anchor));        
+
+    if (iconChanged) {
+        this.setIcon(options.icon);
+    }
+  }
+
+  if (options.label) {
+    this.setLabel(options.label);
+  }
+
+  if (options.opacity) {
+    this.setOpacity(options.opacity);
+  }
+
+  if (options.place) {
+    this.setPlace(options.place);
+  }
+
+  //Position
+  var oldPosition = this.getPosition();
+  if (oldPosition && options.position && !options.position.equals(options.position)) {
+    this.setPosition(options.position);      
+  } 
+
+  if (options.shape) {
+    this.setShape(options.shape);
+  }
+
+  if (options.title) {
+    this.setTitle(options.title);
+  }  
+
+  if (options.visible) {
+    this.setVisible(options.visible);
+  }
+  
+  var zIndexChanged = false;
+  var oldZIndex = this.getZIndex();
+  if (oldZIndex && options.zIndex && options.zIndex != oldZIndex) {
+    this.setZIndex(options.zIndex);    
+  }
+
+  this.labelClass = options.labelClass;
+  this.labelInBackground = options.labelInBackground;
+  this.labelStyle = options.labelStyle;
+  this.labelContent = options.labelContent;  
+  this.labelAnchor = options.labelAnchor;        
+  this.labelVisible = options.labelVisible;
+ 
+  this.label.draw();
 };
